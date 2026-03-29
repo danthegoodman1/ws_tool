@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ink WebSocket Chat Sample Client</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3efe6;
+        --panel: rgba(255, 252, 246, 0.9);
+        --panel-strong: #fffaf1;
+        --border: #d9cdb5;
+        --text: #1b1a18;
+        --muted: #655f55;
+        --accent: #0f766e;
+        --accent-strong: #115e59;
+        --remote: #0f766e;
+        --you: #1d4ed8;
+        --event: #7c2d12;
+        --error: #b91c1c;
+        --shadow: 0 20px 60px rgba(75, 59, 36, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font: 16px/1.5 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(15, 118, 110, 0.14), transparent 32%),
+          radial-gradient(circle at top right, rgba(217, 119, 6, 0.12), transparent 28%),
+          linear-gradient(180deg, #f7f1e5 0%, #efe6d4 100%);
+      }
+
+      .shell {
+        width: min(920px, calc(100vw - 32px));
+        margin: 32px auto;
+        padding: 24px;
+        border: 1px solid rgba(217, 205, 181, 0.85);
+        border-radius: 24px;
+        background: var(--panel);
+        backdrop-filter: blur(10px);
+        box-shadow: var(--shadow);
+      }
+
+      .header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+
+      .title-block h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 3.2rem);
+        line-height: 1;
+        letter-spacing: -0.04em;
+      }
+
+      .title-block p {
+        margin: 8px 0 0;
+        max-width: 52rem;
+        color: var(--muted);
+      }
+
+      .status-card {
+        min-width: 220px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: var(--panel-strong);
+      }
+
+      .status-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 0.85rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .status-value {
+        font-weight: 700;
+      }
+
+      .toolbar,
+      .composer {
+        display: grid;
+        gap: 12px;
+      }
+
+      .toolbar {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        margin-bottom: 18px;
+      }
+
+      .composer {
+        grid-template-columns: minmax(0, 1fr) auto;
+        margin-top: 16px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 0.95rem;
+        color: var(--muted);
+      }
+
+      input,
+      button {
+        font: inherit;
+      }
+
+      input {
+        width: 100%;
+        padding: 13px 15px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.78);
+        color: var(--text);
+      }
+
+      input:focus {
+        outline: 2px solid rgba(15, 118, 110, 0.22);
+        border-color: var(--accent);
+      }
+
+      button {
+        padding: 13px 18px;
+        border: 0;
+        border-radius: 14px;
+        cursor: pointer;
+        color: #fff;
+        background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+        transition: transform 120ms ease, opacity 120ms ease;
+      }
+
+      button.secondary {
+        color: var(--text);
+        background: linear-gradient(180deg, #f8f2e6, #eadfc7);
+        border: 1px solid var(--border);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      button:not(:disabled):hover {
+        transform: translateY(-1px);
+      }
+
+      .transcript {
+        height: min(62vh, 560px);
+        overflow: auto;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(252, 248, 239, 0.92)),
+          repeating-linear-gradient(
+            180deg,
+            transparent 0,
+            transparent 27px,
+            rgba(96, 88, 74, 0.05) 27px,
+            rgba(96, 88, 74, 0.05) 28px
+          );
+      }
+
+      .empty {
+        color: var(--muted);
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+        padding: 4px 0;
+      }
+
+      .time {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .bubble {
+        min-width: 0;
+        word-break: break-word;
+      }
+
+      .bubble strong {
+        display: inline-block;
+        width: 66px;
+      }
+
+      .remote strong {
+        color: var(--remote);
+      }
+
+      .you strong {
+        color: var(--you);
+      }
+
+      .event {
+        color: var(--event);
+        font-style: italic;
+      }
+
+      .error {
+        color: var(--error);
+      }
+
+      .note {
+        margin-top: 14px;
+        color: var(--muted);
+      }
+
+      code {
+        font-family: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 0.92em;
+      }
+
+      @media (max-width: 700px) {
+        .shell {
+          margin: 16px auto;
+          padding: 16px;
+          border-radius: 20px;
+        }
+
+        .toolbar,
+        .composer {
+          grid-template-columns: 1fr;
+        }
+
+        .row {
+          grid-template-columns: 1fr;
+          gap: 2px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="header">
+        <div class="title-block">
+          <h1>Browser Chat</h1>
+          <p>
+            A self-contained sample client for the Ink websocket CLI. Each browser tab opens a
+            brand new websocket connection and does not send a resume id, so every tab appears as
+            its own session in the terminal UI.
+          </p>
+        </div>
+
+        <aside class="status-card">
+          <span class="status-label">Connection</span>
+          <div id="status" class="status-value">Disconnected</div>
+          <div class="note" id="tab-label"></div>
+        </aside>
+      </section>
+
+      <section class="toolbar">
+        <label>
+          WebSocket URL
+          <input id="ws-url" spellcheck="false" />
+        </label>
+        <button id="connect-button" type="button">Connect</button>
+        <button id="disconnect-button" type="button" class="secondary" disabled>Disconnect</button>
+      </section>
+
+      <section id="transcript" class="transcript" aria-live="polite">
+        <div class="empty">No messages yet. Connect to start chatting.</div>
+      </section>
+
+      <form id="composer" class="composer">
+        <label>
+          Message
+          <input
+            id="message-input"
+            placeholder="Type a message for the CLI session"
+            autocomplete="off"
+            disabled
+          />
+        </label>
+        <button id="send-button" type="submit" disabled>Send</button>
+      </form>
+
+      <p class="note">
+        Tip: open this file in two tabs to create two separate sessions in the CLI. The protocol is
+        a single JSON payload shaped like <code>{ "message": "hello" }</code>.
+      </p>
+    </main>
+
+    <script>
+      const transcript = document.getElementById('transcript')
+      const statusEl = document.getElementById('status')
+      const wsUrlInput = document.getElementById('ws-url')
+      const messageInput = document.getElementById('message-input')
+      const connectButton = document.getElementById('connect-button')
+      const disconnectButton = document.getElementById('disconnect-button')
+      const sendButton = document.getElementById('send-button')
+      const composer = document.getElementById('composer')
+      const tabLabel = document.getElementById('tab-label')
+
+      const defaultWsUrl =
+        new URLSearchParams(window.location.search).get('ws') ||
+        'ws://localhost:8888'
+
+      const tabId =
+        (window.crypto && typeof window.crypto.randomUUID === 'function'
+          ? window.crypto.randomUUID()
+          : `tab-${Math.random().toString(16).slice(2)}`)
+          .split('-')[0]
+
+      let socket = null
+
+      wsUrlInput.value = defaultWsUrl
+      tabLabel.textContent = `tab ${tabId}`
+
+      connectButton.addEventListener('click', connect)
+      disconnectButton.addEventListener('click', disconnect)
+
+      composer.addEventListener('submit', (event) => {
+        event.preventDefault()
+        sendMessage()
+      })
+
+      function connect() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          return
+        }
+
+        const rawUrl = wsUrlInput.value.trim()
+
+        if (!rawUrl) {
+          appendEvent('Enter a websocket URL first.', true)
+          return
+        }
+
+        try {
+          // Intentionally omit any session id so each browser tab gets a fresh server-side session.
+          socket = new WebSocket(rawUrl)
+        } catch (error) {
+          appendEvent(`Failed to create websocket: ${error.message}`, true)
+          return
+        }
+
+        setUiState('connecting')
+        appendEvent(`connecting to ${rawUrl}`)
+
+        socket.addEventListener('open', () => {
+          setUiState('connected')
+          appendEvent('connected')
+          messageInput.focus()
+        })
+
+        socket.addEventListener('message', (event) => {
+          const text = decodeMessageData(event.data)
+          const parsed = safeParseMessage(text)
+
+          if (!parsed) {
+            appendEvent(`received non-chat payload: ${text}`, true)
+            return
+          }
+
+          appendMessage('remote', parsed.message)
+        })
+
+        socket.addEventListener('close', (event) => {
+          const detail = event.wasClean
+            ? `disconnected (${event.code})`
+            : `connection closed unexpectedly (${event.code})`
+
+          appendEvent(detail, !event.wasClean && event.code !== 1000)
+          socket = null
+          setUiState('disconnected')
+        })
+
+        socket.addEventListener('error', () => {
+          appendEvent('websocket error', true)
+        })
+      }
+
+      function disconnect() {
+        if (!socket) {
+          return
+        }
+
+        socket.close(1000, 'Client disconnect')
+      }
+
+      function sendMessage() {
+        const text = messageInput.value.trim()
+
+        if (!socket || socket.readyState !== WebSocket.OPEN || !text) {
+          return
+        }
+
+        socket.send(JSON.stringify({ message: text }))
+        appendMessage('you', text)
+        messageInput.value = ''
+        messageInput.focus()
+      }
+
+      function setUiState(state) {
+        const connected = state === 'connected'
+        const connecting = state === 'connecting'
+
+        statusEl.textContent = connected
+          ? 'Connected'
+          : connecting
+            ? 'Connecting...'
+            : 'Disconnected'
+
+        statusEl.className = connecting ? 'status-value' : connected ? 'status-value' : 'status-value'
+        wsUrlInput.disabled = connected || connecting
+        connectButton.disabled = connected || connecting
+        disconnectButton.disabled = !connected && !connecting
+        messageInput.disabled = !connected
+        sendButton.disabled = !connected
+      }
+
+      function appendMessage(sender, text) {
+        clearEmptyState()
+
+        const row = document.createElement('div')
+        row.className = 'row'
+
+        const time = document.createElement('div')
+        time.className = 'time'
+        time.textContent = formatTime(new Date())
+
+        const bubble = document.createElement('div')
+        bubble.className = `bubble ${sender}`
+
+        const label = document.createElement('strong')
+        label.textContent = sender === 'you' ? 'you>' : 'remote>'
+
+        bubble.append(label, document.createTextNode(` ${text}`))
+        row.append(time, bubble)
+        transcript.append(row)
+        transcript.scrollTop = transcript.scrollHeight
+      }
+
+      function appendEvent(text, isError = false) {
+        clearEmptyState()
+
+        const row = document.createElement('div')
+        row.className = 'row'
+
+        const time = document.createElement('div')
+        time.className = 'time'
+        time.textContent = formatTime(new Date())
+
+        const detail = document.createElement('div')
+        detail.className = `bubble event${isError ? ' error' : ''}`
+        detail.textContent = `event> ${text}`
+
+        row.append(time, detail)
+        transcript.append(row)
+        transcript.scrollTop = transcript.scrollHeight
+      }
+
+      function clearEmptyState() {
+        const empty = transcript.querySelector('.empty')
+
+        if (empty) {
+          empty.remove()
+        }
+      }
+
+      function decodeMessageData(data) {
+        if (typeof data === 'string') {
+          return data
+        }
+
+        if (data instanceof Blob) {
+          appendEvent('received blob payload; this sample expects text frames', true)
+          return ''
+        }
+
+        if (data instanceof ArrayBuffer) {
+          return new TextDecoder().decode(data)
+        }
+
+        return String(data)
+      }
+
+      function safeParseMessage(text) {
+        if (!text) {
+          return null
+        }
+
+        try {
+          const parsed = JSON.parse(text)
+          return parsed && typeof parsed.message === 'string' ? parsed : null
+        } catch {
+          return null
+        }
+      }
+
+      function formatTime(date) {
+        return [date.getHours(), date.getMinutes(), date.getSeconds()]
+          .map((value) => String(value).padStart(2, '0'))
+          .join(':')
+      }
+    </script>
+  </body>
+</html>

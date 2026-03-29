@@ -1,0 +1,28 @@
+{
+  "name": "ink-ws-chat",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Ink websocket chat TUI",
+  "dependencies": {
+    "human-readable-ids": "^1.0.4",
+    "ink": "^6.8.0",
+    "react": "^19.2.4",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.14",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.19.0",
+    "typescript": "~5.8.0"
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "watch": "tsx watch src/index.ts",
+    "build": "tsc",
+    "test": "node --import=tsx --test src/**/*.test.ts"
+  },
+  "author": "danthegoodman1",
+  "license": "ISC"
+}
